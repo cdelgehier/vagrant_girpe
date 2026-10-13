@@ -1,8 +1,5 @@
-# Changer la langue du système en français
+# Use French formats and keyboard without requiring a downloaded display language.
+$ErrorActionPreference = 'Stop'
 Set-WinSystemLocale -SystemLocale fr-FR
-
-# Changer la langue de l'interface utilisateur en français
-Set-WinUILanguageOverride -Language fr-FR
-
-# Changer la disposition du clavier en français (AZERTY)
+Set-Culture -CultureInfo fr-FR
 Set-WinUserLanguageList -LanguageList fr-FR -Force
