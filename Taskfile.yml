@@ -1,0 +1,28 @@
+version: "3"
+
+tasks:
+  ci:
+    cmds:
+      - uv sync --locked
+      - uv run --locked ruff check tests
+      - uv run --locked ruff format --check tests
+      - uv run --locked ty check tests
+      - task: test
+      - pwsh -NoProfile -File tests/check-powershell.ps1
+      - vagrant validate
+  test:
+    cmd: uv run --locked pytest tests/test_package.py
+  up:
+    preconditions:
+      - sh: |
+          vagrant box list --machine-readable | awk -F, '
+            $3 == "box-name" { name = $4 }
+            $3 == "box-provider" { provider = $4 }
+            $3 == "box-architecture" && name == "image-factory/windows-11-arm64" && provider == "libvirt" && $4 == "arm64" { found = 1 }
+            END { exit !found }'
+        msg: "The Windows ARM64 box is missing. Build and test it with Image Factory, then import it as image-factory/windows-11-arm64 with the libvirt provider. See Prepare the box in README.md."
+    cmd: vagrant up --provider=qemu
+  test:runtime:
+    cmd: uv run --locked pytest tests/runtime --junitxml=reports/runtime-tests.xml
+  halt:
+    cmd: vagrant halt

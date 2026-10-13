@@ -1,5 +1,10 @@
-# General
 .vagrant/
-
-# Log files (if you are creating logs in debug mode, uncomment this)
-# *.log
+GIRPEclasseur/*
+!GIRPEclasseur/.gitkeep
+backups/
+reports/
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+.DS_Store

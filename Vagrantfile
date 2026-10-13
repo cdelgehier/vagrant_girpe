@@ -1,80 +1,42 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
-
-# All Vagrant configuration is done below. The "2" in Vagrant.configure
-# configures the configuration version (we support older styles for
-# backwards compatibility). Please don't change it unless you know what
-# you're doing.
-
 Vagrant.configure("2") do |config|
-  # The most common configuration options are documented and commented below.
-  # For a complete reference, please see the online documentation at
-  # https://docs.vagrantup.com.
+  config.vm.box = "image-factory/windows-11-arm64"
+  config.vm.box_architecture = "arm64"
+  config.vm.box_check_update = false
+  config.vm.hostname = "girpe-lab"
+  # Keep later Vagrant commands connected to this VM after a restart.
+  config.vm.network "forwarded_port", guest: 5986, host: 55986,
+    host_ip: "127.0.0.1", id: "winrm-ssl", auto_correct: false
 
-  # Every Vagrant development environment requires a box. You can search for
-  # boxes at https://vagrantcloud.com/search.
-  #config.vm.box = "stromweld/windows-2022"
-  config.vm.box = "gusztavvargadr/windows-11"
+  # The box supplies HTTPS WinRM. Desktop and file access are enabled here.
+  config.vm.network "forwarded_port", guest: 3389, host: 13389,
+    host_ip: "127.0.0.1", id: "rdp", auto_correct: false
+  config.vm.network "forwarded_port", guest: 445, host: 1445,
+    host_ip: "127.0.0.1", id: "documents", auto_correct: false
+  config.rdp.username = "vagrant"
 
-  # Disable automatic box update checking. If you disable this, then
-  # boxes will only be checked for updates when the user runs
-  # `vagrant box outdated`. This is not recommended.
-  # config.vm.box_check_update = false
-
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine. In the example below,
-  # accessing "localhost:8080" will access port 80 on the guest machine.
-  # NOTE: This will enable public access to the opened port
-  # config.vm.network "forwarded_port", guest: 80, host: 8080
-
-  # Create a forwarded port mapping which allows access to a specific port
-  # within the machine from a port on the host machine and only allow access
-  # via 127.0.0.1 to disable public access
-  # config.vm.network "forwarded_port", guest: 80, host: 8080, host_ip: "127.0.0.1"
-
-  # Create a private network, which allows host-only access to the machine
-  # using a specific IP.
-  # config.vm.network "private_network", ip: "192.168.33.10"
-
-  # Create a public network, which generally matched to bridged network.
-  # Bridged networks make the machine appear as another physical device on
-  # your network.
-  # config.vm.network "public_network"
-
-  # Share an additional folder to the guest VM. The first argument is
-  # the path on the host to the actual folder. The second argument is
-  # the path on the guest to mount the folder. And the optional third
-  # argument is a set of non-required options.
-  # config.vm.synced_folder "../data", "/vagrant_data"
-
-  # Disable the default share of the current code directory. Doing this
-  # provides improved isolation between the vagrant box and your host
-  # by making sure your Vagrantfile isn't accessible to the vagrant box.
-  # If you use this you may want to enable additional shared subfolders as
-  # shown above.
-  # config.vm.synced_folder ".", "/vagrant", disabled: true
-
-  # Provider-specific configuration so you can fine-tune various
-  # backing providers for Vagrant. These expose provider-specific options.
-  # Example for VirtualBox:
-  #
-  config.vm.provider "virtualbox" do |vb|
-    # Display the VirtualBox GUI when booting the machine
-    #vb.gui = true
-
-    # Customize the amount of memory on the VM:
-    vb.memory = "2048"
+  config.vm.provider "qemu" do |qemu|
+    qemu.arch = "aarch64"
+    qemu.machine = "virt,accel=hvf"
+    qemu.cpu = "host"
+    qemu.smp = "4"
+    qemu.memory = "8G"
+    # QEMU reserves an SSH port even when Windows uses WinRM.
+    qemu.ssh_auto_correct = true
+    qemu.drive_interface = "none"
+    qemu.net_device = "virtio-net-pci"
+    # ARM Windows needs both its NVMe disk and the UEFI framebuffer.
+    qemu.extra_qemu_args = ["-device", "ramfb",
+      "-device", "nvme,drive=disk0,serial=image-factory"]
   end
 
-  # Use type bridge for network printer
-  config.vm.network "public_network", type: "bridge"
-
-
-  # View the documentation for the provider you are using for more
-  # information on available options.
-
-  config.vm.provision :shell, :path => "provision/set_french_locale.ps1"
-  config.vm.provision :shell, :path => "provision/install_girpe.ps1"
-
-  config.vm.synced_folder "GIRPEclasseur/", "C:/GIRPE/GIRPEclasseur"
+  # WinRM already has admin rights; use it without a second scheduled logon.
+  config.vm.provision "shell", privileged: false,
+    inline: "New-Item -ItemType Directory -Path C:/GirpeProvision -Force | Out-Null"
+  config.vm.provision "file", source: "provision/source.json",
+    destination: "C:/GirpeProvision/source.json"
+  config.vm.provision "file", source: "provision/prepare-package.ps1",
+    destination: "C:/GirpeProvision/prepare-package.ps1"
+  config.vm.provision "shell", path: "provision/install_girpe.ps1", privileged: false
+  config.vm.provision "shell", path: "provision/set_french_locale.ps1", privileged: false
+  config.vm.provision "shell", path: "provision/desktop.ps1", privileged: false
 end

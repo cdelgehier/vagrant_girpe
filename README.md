@@ -1,56 +1,89 @@
-# GIRPE Vagrant
+# GIRPE2 Windows lab
 
+Run the official [GIRPE2 application](https://www.fftt.com/deploiements/girpe-v2/)
+in a Windows 11 ARM64 VM on Apple Silicon. This lab also checks desktop access,
+application compatibility and document exchange with the host.
 
-## Introduction
+The pinned package is **GIRPE2 2.2.3**, published by FFTT on 19 May 2026.
+Its portable Windows application is x64 and uses Windows ARM64 emulation.
+The package includes the application runtime. The setup checks the archive's
+SHA-256, copies the executable to `C:\Girpe` and creates a desktop shortcut.
+It keeps Defender and the Windows certificate store settings.
 
-Ce projet vise à simplifier le déploiement et la configuration de l'environnement nécessaire pour exécuter GIRPE sur une machine virtuelle.
-GIRPE, développé par la Fédération Française de Tennis de Table (FFTT), est une application essentielle pour la gestion des résultats et des compétitions de tennis de table.
+## Prepare the box
 
-Le but premier de ce projet était de rendre l'utilisation de GIRPE possible et simple sous Linux et macOS.
-En utilisant Vagrant, une solution de virtualisation de boîtes légère et portable, vous êtes en mesure de fournir un environnement de développement et de test cohérent, indépendamment du système d'exploitation hôte.
+Build and test the private Windows box with
+[Image Factory](https://github.com/cdelgehier/image-factory/tree/main/targets/windows-11-arm64).
+Follow that target's instructions to import it as
+`image-factory/windows-11-arm64`. Windows images are not published in Factory
+releases or catalogues.
 
-## Prérequis
+The Factory build and guest tests must finish successfully before you import
+the box. `task up` checks for the imported ARM64 box with the `libvirt` format
+used by `vagrant-qemu`. If it is missing, the task stops with a setup message.
 
-Avant de commencer à utiliser ce projet de provisionnement Vagrant pour GIRPE, assurez-vous d'avoir les éléments suivants installés sur votre système :
+Install Vagrant, QEMU and `vagrant-qemu` 0.6.3. The VM uses four CPUs and
+8 GiB of RAM. Install Task, uv and PowerShell to run the project checks:
 
-- Vagrant: Vagrant est un logiciel open-source permettant de créer et de gérer des environnements de développement virtualisés. Assurez-vous de disposer de la dernière version de Vagrant installée sur votre système. Vous pouvez le télécharger à partir du site officiel de Vagrant : https://www.vagrantup.com/.
+```sh
+brew install go-task uv qemu
+brew install --cask powershell
+vagrant plugin install vagrant-qemu --plugin-version 0.6.3
+```
 
-- VirtualBox: VirtualBox est un logiciel de virtualisation open-source largement utilisé. Il est pris en charge par défaut par Vagrant. Assurez-vous d'avoir VirtualBox installé sur votre système si vous prévoyez d'utiliser le fournisseur VirtualBox pour Vagrant. Vous pouvez le télécharger à partir du site officiel de VirtualBox : https://www.virtualbox.org/.
+## Start and connect
 
-- Connexion Internet stable : Assurez-vous d'avoir une connexion Internet stable et rapide, car le script de provisionnement téléchargera les fichiers nécessaires depuis des sources externes.
+From this repository:
 
-Une fois que vous avez vérifié que ces prérequis sont remplis, vous êtes prêt à démarrer avec la configuration de votre environnement GIRPE à l'aide de Vagrant. Suivez les instructions ci-dessous pour configurer et provisionner votre machine virtuelle avec GIRPE.
+```sh
+task ci
+task up
+vagrant rdp
+```
 
+You can also connect with a Remote Desktop client to `127.0.0.1:13389`.
+The initial account and password are `vagrant`. Use your changed password
+if you changed it in the guest. WinRM follows `IMAGE_FACTORY_WINDOWS_PASSWORD`.
+Desktop access uses Network Level Authentication. Host ports listen on loopback.
+The guest keeps an English interface with French formats and keyboard settings.
+Sign out and back in to apply user settings.
 
-## Démarrage avec le Provisionnement de la Machine Virtuelle
+Open the GIRPE2 desktop shortcut. Sign in with your FFTT account when needed.
+The automated checks do not sign in or send competition results.
 
-Pour débuter avec le provisionnement de la machine virtuelle pour GIRPE, vous avez deux options :
-- cloner le dépôt Git
-- Télécharger l'archive ZIP depuis la source où il est disponible
+## Keep your documents
 
-Une fois que vous avez récupéré le projet sur votre système, accédez au répertoire du projet dans votre terminal.
-Ensuite, lancez la machine virtuelle en utilisant la commande `vagrant up`.
-Une fois que la machine virtuelle est démarrée, vous pouvez vous y connecter en utilisant la commande `vagrant rdp`.
-Les identifiants par défaut pour la connexion sont `vagrant` pour le nom d'utilisateur et `vagrant` pour le mot de passe.
+Choose `C:\GirpeData` as the application's external backup folder. This folder
+is available from the Mac through an authenticated SMB share:
 
-Voici un enregistrement vidéo de ces étapes en action :
+```sh
+open 'smb://127.0.0.1:1445/GIRPEData'
+```
 
-[![asciicast](https://asciinema.org/a/642761.svg)](https://asciinema.org/a/642761)
+Use the guest's `vagrant` account and password when Finder asks. You can copy
+files in both directions. Before replacing or destroying the VM, copy the
+backup folder to a host folder and check that your saved files are there.
+The share is on the guest disk; it is not a host shared folder.
+The old `GIRPEclasseur` host folder is kept for existing files.
 
-Suivez ces étapes pour commencer à utiliser GIRPE sur votre machine virtuelle provisionnée via Vagrant.
+## Check the lab
 
-![](images/windows_rdp.png)
+```sh
+task test:runtime
+task halt
+```
 
-## Remarques Importantes avant de Commencer
+Runtime checks cover the installed version, ARM64 Windows, RDP negotiation,
+a document round trip through encrypted SMB and an application window in the
+interactive desktop. Sign in to the desktop before running them. Diagnostics
+and the test report are saved in `reports/`. Tests remove their temporary file,
+scheduled task and application process. They keep the VM and your documents.
 
-Avant de démarrer avec l'usage de la machine virtuelle pour GIRPE, il est essentiel de prendre en compte quelques points importants :
+For printing, first select Microsoft Print to PDF in Windows and save the file
+in `C:\GirpeData`. You can then print it from macOS. A network printer can be
+added in Windows by its IP address if it is reachable from the VM. Automatic
+printer discovery and RDP printer redirection depend on the network and client;
+they are not covered by the automated tests.
 
-- L'interface graphique choisie lors du démarrage doit être celle du réseau où se trouve l'imprimante qui sera utilisée. Pour une raison inconnue, GIRPE peut refuser de se lancer si une imprimante n'est pas reconnue. Assurez-vous donc que l'imprimante nécessaire est accessible depuis cette interface.
-
-![](images/wifi_interface.png)
-
-- Les classeurs de matchs créés dans la machine virtuelle sont accessibles depuis l'hôte macOS ou Linux dans le dossier "GIRPEclasseur/". Si vous souhaitez synchroniser davantage de répertoires entre la machine virtuelle et l'hôte, vous pouvez modifier le fichier Vagrantfile en conséquence.
-
-- Lorsque vous utilisez un hôte macOS, la saisie de mot de passe pour l'envoi des résultats vers SPID peut poser problème en raison de différences de clavier. Il est recommandé de s'assurer que les caractères saisis sont corrects en les tapant préalablement dans un éditeur de texte tel que Notepad, puis de les copier-coller depuis l'hôte dans la fenêtre RDP de la machine virtuelle. Cela évitera les erreurs de frappe et garantira la précision des données envoyées à SPID.
-
-- En cas de dysfonctionnement ou de compromission de la machine virtuelle par un virus ou toute autre cause, une solution simple consiste à exécuter la commande `vagrant destroy` suivie de `vagrant up`. Cela rétablira la situation en recréant la machine virtuelle à partir de zéro. Toutefois, veuillez noter que vous devrez reconfigurer les paramètres SMTP si nécessaire pour assurer le bon fonctionnement de l'envoi de mails depuis GIRPE. D'ailleurs pour boite de club sur GMAIL il est important de lire ceci http://girpe.com/v5/GMAIL_GIRPE.pdf
+See the official [user manual](https://www.fftt.com/deploiements/girpe-v2/downloads/FFTT-Documentation%20Utilisateur-GirpeV2.pdf)
+for application backups and offline use.
